@@ -1,4 +1,4 @@
-import type { CreateHook, Hook } from '@logto/schemas';
+import type { CreateHook, Hook, HookEventType } from '@logto/schemas';
 import { Hooks } from '@logto/schemas';
 import type { OmitAutoSetFields } from '@logto/shared';
 import { conditionalSql, convertToIdentifiers } from '@logto/shared';
@@ -25,6 +25,13 @@ export const findAllHooks = async (limit: number, offset: number) =>
     from ${table}
     ${conditionalSql(limit, (limit) => sql`limit ${limit}`)}
     ${conditionalSql(offset, (offset) => sql`offset ${offset}`)}
+  `);
+
+export const findHooksByType = async (type: HookEventType) =>
+  envSet.pool.any<Hook>(sql`
+    select ${sql.join(Object.values(fields), sql`, `)}
+    from ${table}
+    where ${fields.event}=${type}
   `);
 
 export const findHookById = buildFindEntityById<CreateHook, Hook>(Hooks);

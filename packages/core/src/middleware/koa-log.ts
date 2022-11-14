@@ -21,6 +21,7 @@ type AddLogContext = (sessionPayload: SessionPayload) => void;
 export type LogContext = {
   addLogContext: AddLogContext;
   log: MergeLog;
+  logger: Logger;
 };
 
 export type WithLogContext<ContextT extends IRouterParamContext = IRouterParamContext> = ContextT &
@@ -91,6 +92,8 @@ export default function koaLog<
     const logger = initLogger({ result: LogResult.Success, ip, userAgent });
     ctx.addLogContext = logger.set;
     ctx.log = logger.log;
+    // Unblock hooks, we'll refactor the logger soon
+    ctx.logger = logger;
 
     try {
       await next();

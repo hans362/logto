@@ -105,6 +105,5 @@ export default function sessionRoutes<T extends AnonymousRouter>(router: T, prov
   passwordlessRoutes(router, provider);
   socialRoutes(router, provider);
   continueRoutes(router, provider);
-
   forgotPasswordRoutes(router, provider);
 }
