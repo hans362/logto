@@ -1,5 +1,6 @@
 import type { User, CreateUser } from '@logto/schemas';
 import { Users, UsersPasswordEncryptionMethod } from '@logto/schemas';
+import type { OmitAutoSetFields } from '@logto/shared';
 import { buildIdGenerator } from '@logto/shared';
 import type { Nullable } from '@silverhand/essentials';
 import { argon2Verify } from 'hash-wasm';
@@ -7,8 +8,9 @@ import pRetry from 'p-retry';
 
 import { buildInsertInto } from '#src/database/insert-into.js';
 import envSet from '#src/env-set/index.js';
-import { findRolesByRoleNames, insertRoles } from '#src/queries/roles.js';
+import { findRoleByRoleName, findRolesByRoleNames, insertRoles } from '#src/queries/roles.js';
 import { hasUserWithId } from '#src/queries/user.js';
+import { insertUsersRoles } from '#src/queries/users-roles.js';
 import assertThat from '#src/utils/assert-that.js';
 import { encryptPassword } from '#src/utils/password.js';
 
@@ -64,7 +66,10 @@ const insertUserQuery = buildInsertInto<CreateUser, User>(Users, {
 
 // Temp solution since Hasura requires a role to proceed authn.
 // The source of default roles should be guarded and moved to database once we implement RBAC.
-export const insertUser: typeof insertUserQuery = async ({ roleNames, ...rest }) => {
+export const insertUser = async ({
+  roleNames,
+  ...rest
+}: OmitAutoSetFields<CreateUser> & { roleNames?: string[] }) => {
   const computedRoleNames = [
     ...new Set((roleNames ?? []).concat(envSet.values.userDefaultRoleNames)),
   ];
@@ -86,5 +91,15 @@ export const insertUser: typeof insertUserQuery = async ({ roleNames, ...rest })
     }
   }
 
-  return insertUserQuery({ roleNames: computedRoleNames, ...rest });
+  const user = await insertUserQuery(rest);
+
+  await Promise.all([
+    computedRoleNames.map(async (roleName) => {
+      const role = await findRoleByRoleName(roleName);
+
+      await insertUsersRoles([{ userId: user.id, roleId: role.id }]);
+    }),
+  ]);
+
+  return user;
 };

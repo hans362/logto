@@ -307,10 +307,7 @@ describe('adminUserRoutes', () => {
 
     const response = await userRequest.patch('/users/foo').send({ roleNames });
     expect(response.status).toEqual(200);
-    expect(response.body).toEqual({
-      ...mockUserResponse,
-      roleNames,
-    });
+    expect(response.body).toEqual(mockUserResponse);
   });
 
   it('PATCH /users/:userId/password', async () => {

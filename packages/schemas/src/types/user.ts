@@ -1,4 +1,4 @@
-import type { CreateUser } from '../db-entries/index.js';
+import type { CreateUser, User } from '../db-entries/index.js';
 
 export const userInfoSelectFields = Object.freeze([
   'id',
@@ -7,7 +7,6 @@ export const userInfoSelectFields = Object.freeze([
   'primaryPhone',
   'name',
   'avatar',
-  'roleNames',
   'customData',
   'identities',
   'lastSignInAt',
@@ -24,3 +23,6 @@ export type UserInfo<Keys extends keyof CreateUser = typeof userInfoSelectFields
 export enum UserRole {
   Admin = 'admin',
 }
+
+// FIXME @sijie remove this after RBAC is completed.
+export type UserWithRoleNames = User & { roleNames: string[] };

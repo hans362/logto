@@ -1,5 +1,5 @@
-import type { User, CreateUser } from '@logto/schemas';
-import { Users, UserRole } from '@logto/schemas';
+import type { User, CreateUser, UserWithRoleNames } from '@logto/schemas';
+import { UsersRoles, Roles, Users, UserRole } from '@logto/schemas';
 import type { OmitAutoSetFields } from '@logto/shared';
 import { conditionalSql, convertToIdentifiers } from '@logto/shared';
 import { sql } from 'slonik';
@@ -9,6 +9,8 @@ import envSet from '#src/env-set/index.js';
 import { DeletionError } from '#src/errors/SlonikError/index.js';
 
 const { table, fields } = convertToIdentifiers(Users);
+const { fields: rolesFields, table: rolesTable } = convertToIdentifiers(Roles);
+const { fields: usersRolesFields, table: usersRolesTable } = convertToIdentifiers(UsersRoles);
 
 export const findUserByUsername = async (username: string) =>
   envSet.pool.maybeOne<User>(sql`
@@ -32,10 +34,22 @@ export const findUserByPhone = async (phone: string) =>
   `);
 
 export const findUserById = async (id: string) =>
-  envSet.pool.one<User>(sql`
-    select ${sql.join(Object.values(fields), sql`,`)}
+  envSet.pool.one<UserWithRoleNames>(sql`
+    select ${sql.join(
+      Object.values(fields).map((field) => sql`${table}.${field}`),
+      sql`,`
+    )}, coalesce(json_agg(${rolesTable}.${rolesFields.name}) filter (where ${rolesTable}.${
+    rolesFields.name
+  } is not null), '[]') as role_names
     from ${table}
+    left join ${usersRolesTable} ON ${table}.${fields.id} = ${usersRolesTable}.${
+    usersRolesFields.userId
+  }
+    left join ${rolesTable} ON ${rolesTable}.${rolesFields.id} = ${usersRolesTable}.${
+    usersRolesFields.roleId
+  }
     where ${fields.id}=${id}
+    group by ${table}.${fields.id}
   `);
 
 export const findUserByIdentity = async (target: string, userId: string) =>
@@ -88,7 +102,9 @@ export const hasUserWithIdentity = async (target: string, userId: string) =>
   );
 
 const buildUserSearchConditionSql = (search: string, isCaseSensitive = false) => {
-  const searchFields = [fields.primaryEmail, fields.primaryPhone, fields.username, fields.name];
+  const searchFields = [fields.primaryEmail, fields.primaryPhone, fields.username, fields.name].map(
+    (field) => sql`${table}.${field}`
+  );
 
   return sql`${sql.join(
     searchFields.map(
@@ -106,7 +122,13 @@ const buildUserConditions = (
 ) => {
   if (hideAdminUser) {
     return sql`
-      where not (${fields.roleNames}::jsonb?${UserRole.Admin})
+      left join ${usersRolesTable} ON ${table}.${fields.id} = ${usersRolesTable}.${
+      usersRolesFields.userId
+    }
+        left join ${rolesTable} ON ${rolesTable}.${rolesFields.id} = ${usersRolesTable}.${
+      usersRolesFields.roleId
+    }
+      where ${rolesTable}.${rolesFields.name} !== ${UserRole.Admin}
       ${conditionalSql(
         search,
         (search) => sql`and (${buildUserSearchConditionSql(search, isCaseSensitive)})`
@@ -142,7 +164,10 @@ export const findUsers = async (
 ) =>
   envSet.pool.any<User>(
     sql`
-      select ${sql.join(Object.values(fields), sql`,`)}
+      select ${sql.join(
+        Object.values(fields).map((field) => sql`${table}.${field}`),
+        sql`,`
+      )}
       from ${table}
       ${buildUserConditions(search, hideAdminUser, isCaseSensitive)}
       limit ${limit}
