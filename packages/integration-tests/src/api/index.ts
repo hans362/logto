@@ -8,5 +8,6 @@ export * from './logs';
 export * from './dashboard';
 export * from './me';
 export * from './wellknown';
+export * from './interaction';
 
 export { default as api, authedAdminApi } from './api';
