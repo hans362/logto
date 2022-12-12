@@ -38,6 +38,10 @@ export default async function initOidc(app: Koa): Promise<Provider> {
       console.log('OIDC error', error);
       throw error;
     },
+    pkce: {
+      methods: ['S256'],
+      required: () => false,
+    },
     cookies: {
       keys: cookieKeys,
       long: cookieConfig,
